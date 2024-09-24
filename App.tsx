@@ -1,118 +1,145 @@
-/**
- * Sample React Native App
- * https://github.com/facebook/react-native
- *
- * @format
- */
-
-import React from 'react';
-import type {PropsWithChildren} from 'react';
-import {
-  SafeAreaView,
-  ScrollView,
-  StatusBar,
+import React, {useState, useEffect} from "react";
+import { 
   StyleSheet,
-  Text,
-  useColorScheme,
   View,
-} from 'react-native';
+  Text,
+  Button,
+  ScrollView,
+  TextInput,
+  } from 'react-native';
 
-import {
-  Colors,
-  DebugInstructions,
-  Header,
-  LearnMoreLinks,
-  ReloadInstructions,
-} from 'react-native/Libraries/NewAppScreen';
+  import CheckBox from "@react-native-community/checkbox";
+  import {
+    ref,
+    onValue,
+    push,
+    update,
+    remove,
+  } from 'firebase/database';
 
-type SectionProps = PropsWithChildren<{
-  title: string;
-}>;
+  import {db} from './firebase-config';
 
-function Section({children, title}: SectionProps): React.JSX.Element {
-  const isDarkMode = useColorScheme() === 'dark';
-  return (
-    <View style={styles.sectionContainer}>
-      <Text
-        style={[
-          styles.sectionTitle,
-          {
-            color: isDarkMode ? Colors.white : Colors.black,
-          },
-        ]}>
-        {title}
-      </Text>
-      <Text
-        style={[
-          styles.sectionDescription,
-          {
-            color: isDarkMode ? Colors.light : Colors.dark,
-          },
-        ]}>
-        {children}
-      </Text>
-    </View>
-  );
-}
+  const App = () => {
 
-function App(): React.JSX.Element {
-  const isDarkMode = useColorScheme() === 'dark';
+    const [todos, setTodos] = useState({});
+    const [presentTodo, setPresentTodo] = useState('');
+    const todosKeys = Object.keys(todos);
 
-  const backgroundStyle = {
-    backgroundColor: isDarkMode ? Colors.darker : Colors.lighter,
+    useEffect( ()=> {
+      return onValue(ref(db, '/todos'), querySnapshot => {
+        let data = querySnapshot.val() || {};
+        let todoItens = {... data};
+        setTodos(todoItens);
+      });
+    }, []);
+
+    function addNewTodo(){
+      push(ref(db,'/todos'), {
+        done : false,
+        title : presentTodo,
+      });
+      setPresentTodo('');
+    }
+
+    function clearTodos() {
+      remove(ref(db, '/todos'));
+    }
+
+    return (
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.contentContentStyle}>
+
+        <TextInput
+            placeholder="Nova Tarefa"
+            value={presentTodo}
+            style={styles.textImput}
+            onChangeText={text => {
+              setPresentTodo(text);
+            }}
+            onSubmitEditing={addNewTodo}
+        />
+
+          <View
+            style={{marginTop:0}}>
+            <Button
+              title="Limpar Lista de Tarefas"
+              onPress={clearTodos}
+              color="red"
+            />
+          </View>
+
+          <View>
+            {todosKeys.length> 0 ? (
+              todosKeys.map(key => (
+                <ToDoItem key={key} id={key} todoItem={todos[key]}/>
+              ))
+            ) : (
+              <Text style={{marginTop:10}}>
+                Não há tarefas pendentes...
+              </Text>
+            )}
+          </View>
+      </ScrollView>
+    );
+
   };
 
-  return (
-    <SafeAreaView style={backgroundStyle}>
-      <StatusBar
-        barStyle={isDarkMode ? 'light-content' : 'dark-content'}
-        backgroundColor={backgroundStyle.backgroundColor}
-      />
-      <ScrollView
-        contentInsetAdjustmentBehavior="automatic"
-        style={backgroundStyle}>
-        <Header />
-        <View
-          style={{
-            backgroundColor: isDarkMode ? Colors.black : Colors.white,
-          }}>
-          <Section title="Step One">
-            Edit <Text style={styles.highlight}>App.tsx</Text> to change this
-            screen and then come back to see your edits.
-          </Section>
-          <Section title="See Your Changes">
-            <ReloadInstructions />
-          </Section>
-          <Section title="Debug">
-            <DebugInstructions />
-          </Section>
-          <Section title="Learn More">
-            Read the docs to discover what to do next:
-          </Section>
-          <LearnMoreLinks />
-        </View>
-      </ScrollView>
-    </SafeAreaView>
-  );
-}
+  const ToDoItem = ({todoItem: {title, done}, id}) => {
 
-const styles = StyleSheet.create({
-  sectionContainer: {
-    marginTop: 32,
-    paddingHorizontal: 24,
-  },
-  sectionTitle: {
-    fontSize: 24,
-    fontWeight: '600',
-  },
-  sectionDescription: {
-    marginTop: 8,
-    fontSize: 18,
-    fontWeight: '400',
-  },
-  highlight: {
-    fontWeight: '700',
-  },
-});
+    const [doneState, setDone] = useState(done);
 
-export default App;
+    const onCheck = isChecked => {
+      setDone(isChecked);
+      update(ref(db, '/todos'), {
+        [id]: {
+          title,
+          done: !doneState,
+        },
+      });
+    };
+    return(
+      <View style={styles.todoItem}>
+        <CheckBox onValueChange={onCheck} value={doneState}/>
+        <Text style={[styles.todoText, {opacity: doneState ? 0.2 : 1 }]}>
+          {title}
+        </Text>
+      </View>
+    );
+  };
+
+  const styles = StyleSheet.create({
+    todoItem: {
+      flexDirection: 'row',
+      marginVertical: 10,
+      alignItems: 'center',
+    },
+
+    todoText: {
+      paddingHorizontal: 5,
+      fontSize: 16,
+    },
+
+    container: {
+      flex: 1,
+      paddingTop: 12,
+    },
+
+    contentContentStyle: {
+      padding: 24,
+    },
+
+    textImput:{
+      borderWidth: 1,
+      borderColor: '#afafaf',
+      borderRadius: 5,
+      paddingHorizontal: 10,
+      marginVertical: 20,
+      fontSize: 20,
+    },
+
+  });
+
+  export default App;
+
+
